@@ -28,8 +28,6 @@ export function WeatherSuggestions({ selectedDate }: WeatherSuggestionsProps) {
       case "sunny":
         return {
           icon: Sun,
-          color: "text-yellow-500",
-          bgColor: "bg-yellow-500/10",
           title: `${dayPrefix} looks sunny!`,
           suggestions: [
             "Perfect for outdoor picnic",
@@ -41,16 +39,12 @@ export function WeatherSuggestions({ selectedDate }: WeatherSuggestionsProps) {
       case "rainy":
         return {
           icon: CloudRain,
-          color: "text-blue-500",
-          bgColor: "bg-blue-500/10",
           title: `${dayPrefix} might be rainy`,
           suggestions: ["Indoor museum visit", "Cozy coffee shop work", "Home movie marathon", "Indoor rock climbing"],
         }
       default:
         return {
           icon: Cloud,
-          color: "text-gray-500",
-          bgColor: "bg-gray-500/10",
           title: `${dayPrefix} looks cloudy`,
           suggestions: [
             "Perfect for outdoor walks",
@@ -62,14 +56,14 @@ export function WeatherSuggestions({ selectedDate }: WeatherSuggestionsProps) {
     }
   }
 
-  const { icon: Icon, color, bgColor, title, suggestions } = getSuggestions()
+  const { icon: Icon, title, suggestions } = getSuggestions()
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-      <Card className="glass-strong border-0 p-6">
+      <Card className="glass-strong border-1 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className={`p-2 rounded-lg ${bgColor}`}>
-            <Icon className={`h-5 w-5 ${color}`} />
+          <div className="p-2 rounded-lg bg-muted/30">
+            <Icon className="h-5 w-5 text-foreground" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">{title}</h3>
