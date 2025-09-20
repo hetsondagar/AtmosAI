@@ -20,6 +20,8 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate()
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay()
   const today = new Date()
+  const maxPredictionDate = new Date()
+  maxPredictionDate.setDate(today.getDate() + 14)
 
   const monthNames = [
     "January",
@@ -39,11 +41,17 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
   const previousMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))
+    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
+    if (newMonth.getMonth() >= today.getMonth() && newMonth.getFullYear() >= today.getFullYear()) {
+      setCurrentMonth(newMonth)
+    }
   }
 
   const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))
+    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
+    if (newMonth <= new Date(maxPredictionDate.getFullYear(), maxPredictionDate.getMonth() + 1, 0)) {
+      setCurrentMonth(newMonth)
+    }
   }
 
   const getEventsForDate = (date: Date) => {
@@ -63,25 +71,31 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
       const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
       const isToday = date.toDateString() === today.toDateString()
       const isSelected = date.toDateString() === selectedDate.toDateString()
+      const isPast = date < today && !isToday
+      const isBeyondPrediction = date > maxPredictionDate
+      const isDisabled = isPast || isBeyondPrediction
       const dayEvents = getEventsForDate(date)
 
       days.push(
         <motion.button
           key={day}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => onDateSelect(date)}
+          whileHover={!isDisabled ? { scale: 1.05 } : {}}
+          whileTap={!isDisabled ? { scale: 0.95 } : {}}
+          onClick={() => !isDisabled && onDateSelect(date)}
+          disabled={isDisabled}
           className={cn(
             "h-12 w-full rounded-lg text-sm font-medium transition-all duration-200 relative",
-            isSelected
+            isSelected && !isDisabled
               ? "bg-primary text-primary-foreground shadow-md"
-              : isToday
+              : isToday && !isDisabled
                 ? "bg-secondary text-secondary-foreground"
-                : "hover:bg-muted text-foreground",
+                : isDisabled
+                  ? "text-muted-foreground cursor-not-allowed opacity-40"
+                  : "hover:bg-muted text-foreground",
           )}
         >
           {day}
-          {dayEvents.length > 0 && (
+          {dayEvents.length > 0 && !isDisabled && (
             <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-0.5">
               {dayEvents.slice(0, 3).map((_, index) => (
                 <div key={index} className="w-1 h-1 bg-current rounded-full opacity-60" />
@@ -95,6 +109,9 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
     return days
   }
 
+  const canGoPrevious = currentMonth.getMonth() > today.getMonth() || currentMonth.getFullYear() > today.getFullYear()
+  const canGoNext = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1) <= new Date(maxPredictionDate.getFullYear(), maxPredictionDate.getMonth() + 1, 0)
+
   return (
     <div className={className}>
       {/* Calendar Header */}
@@ -103,10 +120,22 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </h3>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={previousMonth} className="h-8 w-8 p-0">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={previousMonth} 
+            disabled={!canGoPrevious}
+            className="h-8 w-8 p-0"
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={nextMonth} className="h-8 w-8 p-0">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={nextMonth} 
+            disabled={!canGoNext}
+            className="h-8 w-8 p-0"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -123,6 +152,11 @@ export function Calendar({ selectedDate, onDateSelect, events, className }: Cale
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-2">{renderCalendarDays()}</div>
+      
+      {/* Weather prediction notice */}
+      <div className="mt-4 text-xs text-muted-foreground text-center">
+        Weather predictions available for the next 14 days
+      </div>
     </div>
   )
 }
