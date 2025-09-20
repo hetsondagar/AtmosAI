@@ -1,0 +1,161 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Updated to premium weather app color palette with glassmorphism support */
+  --background: #ecfeff; /* Soft cyan background */
+  --foreground: #475569; /* Slate text for readability */
+  --card: rgba(255, 255, 255, 0.7); /* Glassmorphism card background */
+  --card-foreground: #374151; /* Dark gray text on cards */
+  --popover: rgba(255, 255, 255, 0.9); /* Semi-transparent popover */
+  --popover-foreground: #374151;
+  --primary: #164e63; /* Deep cyan primary */
+  --primary-foreground: #ffffff;
+  --secondary: #d97706; /* Warm amber accent */
+  --secondary-foreground: #ffffff;
+  --muted: #fefce8; /* Light yellow muted background */
+  --muted-foreground: #374151;
+  --accent: #d97706; /* Amber accent */
+  --accent-foreground: #ffffff;
+  --destructive: #ea580c; /* Orange for alerts */
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1); /* Subtle transparent border */
+  --input: #ffffff;
+  --ring: rgba(0, 0, 0, 0.2);
+  --chart-1: #d97706; /* Amber for charts */
+  --chart-2: #164e63; /* Cyan for charts */
+  --chart-3: #ea580c; /* Orange for charts */
+  --chart-4: #ffffff;
+  --chart-5: #475569;
+  --radius: 0.75rem; /* Increased radius for modern look */
+  --sidebar: rgba(255, 255, 255, 0.8);
+  --sidebar-foreground: #374151;
+  --sidebar-primary: #164e63;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #d97706;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(0, 0, 0, 0.1);
+  --sidebar-ring: rgba(0, 0, 0, 0.2);
+
+  /* Added custom weather-specific variables */
+  --glass-bg: rgba(255, 255, 255, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --weather-sunny: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --weather-cloudy: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  --weather-rainy: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+}
+
+.dark {
+  /* Updated dark mode with deep indigos and neon accents */
+  --background: #0f172a; /* Deep slate background */
+  --foreground: #e2e8f0; /* Light slate text */
+  --card: rgba(15, 23, 42, 0.8); /* Dark glassmorphism */
+  --card-foreground: #e2e8f0;
+  --popover: rgba(15, 23, 42, 0.95);
+  --popover-foreground: #e2e8f0;
+  --primary: #06b6d4; /* Bright cyan primary */
+  --primary-foreground: #0f172a;
+  --secondary: #f59e0b; /* Bright amber */
+  --secondary-foreground: #0f172a;
+  --muted: rgba(30, 41, 59, 0.5);
+  --muted-foreground: #94a3b8;
+  --accent: #06b6d4; /* Neon cyan accent */
+  --accent-foreground: #0f172a;
+  --destructive: #f97316; /* Bright orange for alerts */
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(30, 41, 59, 0.8);
+  --ring: rgba(6, 182, 212, 0.3);
+  --chart-1: #06b6d4;
+  --chart-2: #f59e0b;
+  --chart-3: #f97316;
+  --chart-4: #8b5cf6;
+  --chart-5: #10b981;
+  --sidebar: rgba(15, 23, 42, 0.9);
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #06b6d4;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #f59e0b;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: rgba(6, 182, 212, 0.3);
+
+  /* Dark mode weather variables */
+  --glass-bg: rgba(15, 23, 42, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --weather-sunny: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  --weather-cloudy: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  --weather-rainy: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Added glassmorphism utility classes */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .dark .glass-strong {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+}
