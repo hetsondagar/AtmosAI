@@ -31,7 +31,7 @@ export function AlertFilters({ selectedFilter, onFilterChange, alerts }: AlertFi
   ]
 
   return (
-    <div className="glass-strong rounded-2xl p-6">
+    <div className="glass-strong rounded-2xl p-6 border-2 border-cyan-100">
       <h3 className="text-lg font-semibold text-foreground mb-4">Filter Alerts</h3>
       <div className="flex flex-wrap gap-3">
         {filters.map((filter, index) => {
@@ -50,7 +50,7 @@ export function AlertFilters({ selectedFilter, onFilterChange, alerts }: AlertFi
                 variant={isSelected ? "default" : "ghost"}
                 onClick={() => onFilterChange(filter.key)}
                 className={cn(
-                  "relative h-auto p-4 flex-col items-start gap-2 min-w-[120px]",
+                  "relative h-auto p-4 flex-col items-start gap-2 min-w-[120px] hover:text-black cursor-pointer",
                   isSelected && "shadow-lg",
                 )}
               >
@@ -59,9 +59,14 @@ export function AlertFilters({ selectedFilter, onFilterChange, alerts }: AlertFi
                   <span className="font-medium">{filter.label}</span>
                 </div>
                 <div className="flex items-center gap-2 w-full text-xs">
-                  <span className="text-muted-foreground">Total: {count}</span>
+                  <span className={cn(
+                    "text-muted-foreground",
+                    isSelected && "text-white dark:text-black"
+                  )}>
+                    Total: {count}
+                  </span>
                   {activeCount > 0 && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0.5 text-black">
                       {activeCount} active
                     </Badge>
                   )}
