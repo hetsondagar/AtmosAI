@@ -104,7 +104,7 @@ export function Settings() {
       </div>
 
       {/* Appearance Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={Palette} title="Appearance" description="Customize the look and feel">
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -122,7 +122,7 @@ export function Settings() {
                   value={settings.temperatureUnit}
                   onValueChange={(value) => updateSetting("temperatureUnit", value)}
                 >
-                  <SelectTrigger className="glass border-0">
+                  <SelectTrigger className="glass border-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -135,7 +135,7 @@ export function Settings() {
               <div className="space-y-2">
                 <Label>Wind Speed</Label>
                 <Select value={settings.windSpeedUnit} onValueChange={(value) => updateSetting("windSpeedUnit", value)}>
-                  <SelectTrigger className="glass border-0">
+                  <SelectTrigger className="glass border-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -149,7 +149,7 @@ export function Settings() {
               <div className="space-y-2">
                 <Label>Pressure Unit</Label>
                 <Select value={settings.pressureUnit} onValueChange={(value) => updateSetting("pressureUnit", value)}>
-                  <SelectTrigger className="glass border-0">
+                  <SelectTrigger className="glass border-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -165,7 +165,7 @@ export function Settings() {
       </motion.div>
 
       {/* Notifications Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={Bell} title="Notifications" description="Manage your alert preferences">
           <div className="space-y-4">
             {[
@@ -198,7 +198,7 @@ export function Settings() {
       </motion.div>
 
       {/* Voice Assistant Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={Mic} title="Voice Assistant" description="Configure voice interactions">
           <div className="space-y-6">
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
@@ -234,7 +234,7 @@ export function Settings() {
                     value={settings.wakeWord}
                     onChange={(e) => updateSetting("wakeWord", e.target.value)}
                     placeholder="Hey AtmosAI"
-                    className="glass border-0"
+                    className="glass border-1"
                   />
                 </div>
               </>
@@ -244,7 +244,7 @@ export function Settings() {
       </motion.div>
 
       {/* Location Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={MapPin} title="Location" description="Manage location preferences">
           <div className="space-y-6">
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
@@ -265,7 +265,7 @@ export function Settings() {
                   value={settings.defaultLocation}
                   onChange={(e) => updateSetting("defaultLocation", e.target.value)}
                   placeholder="Enter city, state or zip code"
-                  className="glass border-0"
+                  className="glass border-1"
                 />
               </div>
             )}
@@ -274,7 +274,7 @@ export function Settings() {
       </motion.div>
 
       {/* Health & Wellness Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={Heart} title="Health & Wellness" description="Personalize health recommendations">
           <div className="space-y-4">
             {[
@@ -307,7 +307,7 @@ export function Settings() {
       </motion.div>
 
       {/* Advanced Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className="border-1 rounded-2xl p-6 glass-strong">
         <SettingsSection icon={Smartphone} title="Advanced" description="Advanced app preferences">
           <div className="space-y-6">
             <div className="space-y-4">
@@ -335,7 +335,7 @@ export function Settings() {
             <div className="space-y-2">
               <Label>Data Usage</Label>
               <Select value={settings.dataUsage} onValueChange={(value) => updateSetting("dataUsage", value)}>
-                <SelectTrigger className="glass border-0">
+                <SelectTrigger className="glass border-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,7 +356,7 @@ export function Settings() {
         transition={{ delay: 0.8 }}
         className="flex gap-4 justify-center pt-8"
       >
-        <Button variant="outline" onClick={resetSettings} className="glass border-0 bg-transparent">
+        <Button variant="outline" onClick={resetSettings} className="glass border-1 bg-transparent">
           <RotateCcw className="h-4 w-4 mr-2" />
           Reset to Defaults
         </Button>

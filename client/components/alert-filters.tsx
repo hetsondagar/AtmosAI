@@ -31,7 +31,7 @@ export function AlertFilters({ selectedFilter, onFilterChange, alerts }: AlertFi
   ]
 
   return (
-    <div className="glass-strong rounded-2xl p-6 border-2 border-cyan-100">
+    <div className="glass-strong rounded-2xl p-6 border-1 border-cyan-100">
       <h3 className="text-lg font-semibold text-foreground mb-4">Filter Alerts</h3>
       <div className="flex flex-wrap gap-3">
         {filters.map((filter, index) => {
