@@ -111,7 +111,14 @@ export function AlertCard({ alert, delay = 0 }: AlertCardProps) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant={config.badgeVariant} className="text-xs">
+                <Badge 
+                  variant={config.badgeVariant} 
+                  className={cn(
+                    "text-xs",
+                    alert.type === "moderate" && "bg-orange-500 text-white hover:bg-orange-600",
+                    alert.type === "info" && "bg-blue-500 text-white hover:bg-blue-600"
+                  )}
+                >
                   {alert.type.toUpperCase()}
                 </Badge>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -143,7 +150,7 @@ export function AlertCard({ alert, delay = 0 }: AlertCardProps) {
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full justify-between text-sm"
+            className="w-full justify-between text-sm hover:text-black cursor-pointer"
           >
             <span>Safety Precautions ({alert.precautions.length})</span>
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

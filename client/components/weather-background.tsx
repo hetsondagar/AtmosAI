@@ -19,13 +19,13 @@ export function WeatherBackground({ condition, className = "" }: WeatherBackgrou
   const getBackgroundStyle = () => {
     switch (condition) {
       case "sunny":
-        return "bg-[#ffa17f] dark:bg-[#00223e]"
+        return "bg-[#EDFCFC] dark:bg-[#0f172a]"
       case "cloudy":
-        return "bg-[#ffa17f] dark:bg-[#00223e]"
+        return "bg-[#EDFCFC] dark:bg-[#0f172a]"
       case "rainy":
-        return "bg-[#ffa17f] dark:bg-[#00223e]"
+        return "bg-[#EDFCFC] dark:bg-[#0f172a]"
       default:
-        return "bg-[#ffa17f] dark:bg-[#00223e]"
+        return "bg-[#EDFCFC] dark:bg-[#0f172a]"
     }
   }
 
