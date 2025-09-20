@@ -60,7 +60,7 @@ export function HealthTip({ condition, uvIndex, aqi }: HealthTipProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.3 }}
     >
-      <Card className="glass-strong border-0 p-6">
+      <Card className="glass-strong border-1 p-6">
         <div className="flex items-start gap-4">
           <div className={`p-3 rounded-xl ${healthTip.bgColor}`}>
             <Icon className={`h-6 w-6 ${healthTip.color}`} />

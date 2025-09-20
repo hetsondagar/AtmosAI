@@ -188,7 +188,7 @@ export function ForecastChart() {
 
 	return (
 		<motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
-			<Card className="glass-strong border-0 p-6">
+			<Card className="glass-strong p-6 border-1">
 				<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
 					<h3 className="text-xl font-semibold text-foreground">Weather Forecast</h3>
 					<div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
