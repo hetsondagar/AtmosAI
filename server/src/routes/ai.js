@@ -7,7 +7,8 @@ const router = express.Router();
 
 // AI Service configuration
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
-const AI_SERVICE_API_KEY = process.env.AI_SERVICE_API_KEY;
+// Default to the AI service's default key so local dev works out of the box
+const AI_SERVICE_API_KEY = process.env.AI_SERVICE_API_KEY || 'default-key';
 
 // @route   POST /api/ai/analyze-weather
 // @desc    Get AI weather analysis and recommendations
