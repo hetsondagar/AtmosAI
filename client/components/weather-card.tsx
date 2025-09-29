@@ -8,9 +8,10 @@ interface WeatherCardProps {
   temperature: number
   condition: "sunny" | "cloudy" | "rainy" | "clear"
   description: string
+  unit?: "°F" | "°C"
 }
 
-export function WeatherCard({ location, temperature, condition, description }: WeatherCardProps) {
+export function WeatherCard({ location, temperature, condition, description, unit = "°F" }: WeatherCardProps) {
   const getWeatherIcon = () => {
     switch (condition) {
       case "sunny":
@@ -61,7 +62,7 @@ export function WeatherCard({ location, temperature, condition, description }: W
         {/* Temperature */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="mb-2">
           <span className="text-6xl font-bold text-foreground">{temperature}</span>
-          <span className="text-2xl text-muted-foreground">°F</span>
+          <span className="text-2xl text-muted-foreground">{unit}</span>
         </motion.div>
 
         {/* Description */}

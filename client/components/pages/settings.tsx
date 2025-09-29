@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { getCurrentUser, updatePreferences, loadLocalSettings, saveLocalSettings } from "@/lib/api"
 import { motion } from "framer-motion"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { SettingsSection } from "@/components/settings-section"
@@ -47,6 +48,46 @@ export function Settings() {
     dataUsage: "standard",
   })
 
+  // Load from backend if authenticated; otherwise from localStorage
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const me = await getCurrentUser()
+        const prefs = me?.data?.user?.preferences
+        if (prefs) {
+          setSettings({
+            theme: prefs.theme || "light",
+            temperatureUnit: prefs.temperatureUnit || "fahrenheit",
+            windSpeedUnit: prefs.windSpeedUnit || "mph",
+            pressureUnit: prefs.pressureUnit || "inHg",
+            weatherAlerts: prefs.notifications?.weatherAlerts ?? true,
+            dailyForecast: prefs.notifications?.dailyForecast ?? true,
+            healthTips: prefs.notifications?.healthTips ?? true,
+            pushNotifications: prefs.notifications?.pushNotifications ?? true,
+            voiceEnabled: prefs.voice?.enabled ?? true,
+            voiceVolume: [prefs.voice?.volume ?? 75],
+            wakeWord: prefs.voice?.wakeWord ?? "Hey AtmosAI",
+            autoLocation: prefs.location?.autoDetect ?? true,
+            defaultLocation: prefs.location?.defaultLocation ?? "San Francisco, CA",
+            healthTipsEnabled: prefs.health?.tipsEnabled ?? true,
+            uvReminders: prefs.health?.uvReminders ?? true,
+            airQualityAlerts: prefs.health?.airQualityAlerts ?? true,
+            activitySuggestions: prefs.health?.activitySuggestions ?? true,
+            backgroundAnimations: prefs.advanced?.backgroundAnimations ?? true,
+            reducedMotion: prefs.advanced?.reducedMotion ?? false,
+            dataUsage: prefs.advanced?.dataUsage ?? "standard",
+          })
+          return
+        }
+      } catch {
+        // not logged in or server unavailable; fall back to local storage
+      }
+      const local = loadLocalSettings("atmosai_settings", null as any)
+      if (local) setSettings(local)
+    }
+    init()
+  }, [])
+
   const updateSetting = (key: string, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
   }
@@ -78,8 +119,49 @@ export function Settings() {
   }
 
   const saveSettings = () => {
-    // In a real app, this would save to backend/localStorage
-    console.log("Settings saved:", settings)
+    // Save to backend if authenticated; else persist locally
+    const payload = {
+      theme: settings.theme,
+      temperatureUnit: settings.temperatureUnit,
+      windSpeedUnit: settings.windSpeedUnit,
+      pressureUnit: settings.pressureUnit,
+      notifications: {
+        weatherAlerts: settings.weatherAlerts,
+        dailyForecast: settings.dailyForecast,
+        healthTips: settings.healthTips,
+        pushNotifications: settings.pushNotifications,
+      },
+      voice: {
+        enabled: settings.voiceEnabled,
+        volume: settings.voiceVolume?.[0] ?? 75,
+        wakeWord: settings.wakeWord,
+      },
+      location: {
+        autoDetect: settings.autoLocation,
+        defaultLocation: settings.defaultLocation,
+      },
+      health: {
+        tipsEnabled: settings.healthTipsEnabled,
+        uvReminders: settings.uvReminders,
+        airQualityAlerts: settings.airQualityAlerts,
+        activitySuggestions: settings.activitySuggestions,
+      },
+      advanced: {
+        backgroundAnimations: settings.backgroundAnimations,
+        reducedMotion: settings.reducedMotion,
+        dataUsage: settings.dataUsage,
+      },
+    }
+
+    updatePreferences(payload)
+      .then(() => {
+        // Also store locally as a cache
+        saveLocalSettings("atmosai_settings", settings)
+      })
+      .catch(() => {
+        // If not authenticated, persist locally
+        saveLocalSettings("atmosai_settings", settings)
+      })
   }
 
   return (

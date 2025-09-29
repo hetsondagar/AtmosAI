@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { Calendar } from "@/components/calendar"
 import { EventCard } from "@/components/event-card"
@@ -8,6 +8,8 @@ import { WeatherSuggestions } from "@/components/weather-suggestions"
 import { AddEventDialog } from "@/components/add-event-dialog"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import { createEvent, deleteEventById, fetchEvents, aiEventRecommendations } from "@/lib/api"
+import { useToast } from "@/components/ui/use-toast"
 
 export interface Event {
   id: string
@@ -22,47 +24,101 @@ export interface Event {
 export function Planner() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [showAddEvent, setShowAddEvent] = useState(false)
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: "1",
-      title: "Morning Jog",
-      date: new Date(),
-      time: "7:00 AM",
-      type: "outdoor",
-      weather: "sunny",
-      description: "30-minute run in the park",
-    },
-    {
-      id: "2",
-      title: "Team Meeting",
-      date: new Date(),
-      time: "10:00 AM",
-      type: "indoor",
-      weather: "any",
-      description: "Weekly team sync",
-    },
-    {
-      id: "3",
-      title: "Picnic with Friends",
-      date: new Date(Date.now() + 86400000), // Tomorrow
-      time: "2:00 PM",
-      type: "outdoor",
-      weather: "sunny",
-      description: "Lunch at Golden Gate Park",
-    },
-  ])
+  const [events, setEvents] = useState<Event[]>([])
+  const { toast } = useToast()
+  const [aiTips, setAiTips] = useState<string[]>([])
+  const [resolvedLocationName, setResolvedLocationName] = useState<string>("")
 
-  const selectedDateEvents = events.filter((event) => event.date.toDateString() === selectedDate.toDateString())
-
-  const addEvent = (event: Omit<Event, "id">) => {
-    const newEvent: Event = {
-      ...event,
-      id: Date.now().toString(),
+  // Fetch events for selected date from backend
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const y = selectedDate.getFullYear()
+        const m = selectedDate.getMonth() + 1
+        const d = selectedDate.getDate().toString().padStart(2, '0')
+        const month = (m).toString().padStart(2, '0')
+        const dateStr = `${y}-${month}-${d}`
+        const res = await fetchEvents({ date: dateStr, limit: 100 })
+        const list = (res?.data || []) as any[]
+        setEvents(list.map((e) => ({
+          id: e._id,
+          title: e.title,
+          date: new Date(e.date),
+          time: e.time,
+          type: e.type,
+          weather: e.weather,
+          description: e.description,
+        })))
+      } catch {
+        setEvents([])
+      }
     }
-    setEvents([...events, newEvent])
+    
+    const loadAI = async () => {
+      try {
+        const loc = await new Promise<{ lat: number; lng: number }>((resolve) => {
+          if (navigator?.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              () => resolve({ lat: 37.7749, lng: -122.4194 }),
+              { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+            )
+          } else {
+            resolve({ lat: 37.7749, lng: -122.4194 })
+          }
+        })
+        const wdRes = await fetch(`http://localhost:5000/api/weather/current?lat=${loc.lat}&lng=${loc.lng}`)
+        const wd = await wdRes.json().catch(() => null)
+        if (wd?.success) {
+          if (wd?.data?.locationName) setResolvedLocationName(wd.data.locationName)
+          const rec = await aiEventRecommendations({ weatherData: { current: wd.data }, date: selectedDate.toISOString() })
+          const tips = rec?.data?.suitable_activities || []
+          setAiTips(tips)
+        } else {
+          setAiTips([])
+        }
+      } catch {
+        setAiTips([])
+      }
+    }
+    
+    load()
+    loadAI()
+  }, [selectedDate])
+
+  const selectedDateEvents = useMemo(() => events.filter((event) => event.date.toDateString() === selectedDate.toDateString()), [events, selectedDate])
+
+  const addEvent = async (event: Omit<Event, "id">) => {
+    try {
+      const payload = {
+        title: event.title,
+        description: event.description,
+        date: event.date.toISOString(),
+        time: event.time,
+        type: event.type,
+        weather: event.weather,
+      }
+      const res = await createEvent(payload as any)
+      const created = res?.data
+      if (created) {
+        setEvents([
+          ...events,
+          {
+            id: created._id,
+            title: created.title,
+            date: new Date(created.date),
+            time: created.time,
+            type: created.type,
+            weather: created.weather,
+            description: created.description,
+          },
+        ])
+      }
+    } catch {}
   }
 
-  const deleteEvent = (eventId: string) => {
+  const deleteEvent = async (eventId: string) => {
+    try { await deleteEventById(eventId) } catch {}
     setEvents(events.filter((event) => event.id !== eventId))
   }
 
@@ -131,7 +187,17 @@ export function Planner() {
           </div>
 
           {/* Weather Suggestions */}
+        <div className="space-y-3">
           <WeatherSuggestions selectedDate={selectedDate} />
+          {aiTips.length > 0 && (
+            <div className="glass-strong rounded-2xl p-4">
+              <div className="text-sm font-semibold mb-2">AI Suggestions</div>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                {aiTips.map((t, i) => (<li key={i}>{t}</li>))}
+              </ul>
+            </div>
+          )}
+        </div>
         </motion.div>
       </div>
 

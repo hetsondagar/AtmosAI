@@ -1,47 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, ComposedChart, AreaChart, Area } from "recharts"
 import { Cloud, CloudRain, Sun, CloudSnow, Zap } from "lucide-react"
+import { getCurrentUser, loadLocalSettings } from "@/lib/api"
 
-const hourlyData = [
-	{ time: "1 AM", temp: 67, humidity: 72, precipitation: 0, windSpeed: 7, condition: "clear" },
-	{ time: "2 AM", temp: 66, humidity: 74, precipitation: 0, windSpeed: 6, condition: "clear" },
-	{ time: "3 AM", temp: 65, humidity: 75, precipitation: 5, windSpeed: 8, condition: "cloudy" },
-	{ time: "4 AM", temp: 64, humidity: 77, precipitation: 0, windSpeed: 9, condition: "cloudy" },
-	{ time: "5 AM", temp: 63, humidity: 79, precipitation: 0, windSpeed: 7, condition: "cloudy" },
-	{ time: "6 AM", temp: 63, humidity: 80, precipitation: 10, windSpeed: 8, condition: "rainy" },
-	{ time: "7 AM", temp: 65, humidity: 78, precipitation: 15, windSpeed: 10, condition: "rainy" },
-	{ time: "8 AM", temp: 67, humidity: 75, precipitation: 8, windSpeed: 9, condition: "cloudy" },
-	{ time: "9 AM", temp: 70, humidity: 65, precipitation: 0, windSpeed: 8, condition: "sunny" },
-	{ time: "10 AM", temp: 73, humidity: 60, precipitation: 0, windSpeed: 7, condition: "sunny" },
-	{ time: "11 AM", temp: 75, humidity: 58, precipitation: 0, windSpeed: 6, condition: "sunny" },
-	{ time: "12 PM", temp: 77, humidity: 55, precipitation: 0, windSpeed: 8, condition: "sunny" },
-	{ time: "1 PM", temp: 78, humidity: 53, precipitation: 0, windSpeed: 9, condition: "sunny" },
-	{ time: "2 PM", temp: 79, humidity: 52, precipitation: 0, windSpeed: 10, condition: "sunny" },
-	{ time: "3 PM", temp: 78, humidity: 50, precipitation: 0, windSpeed: 11, condition: "sunny" },
-	{ time: "4 PM", temp: 77, humidity: 52, precipitation: 0, windSpeed: 10, condition: "sunny" },
-	{ time: "5 PM", temp: 76, humidity: 55, precipitation: 0, windSpeed: 9, condition: "cloudy" },
-	{ time: "6 PM", temp: 74, humidity: 60, precipitation: 0, windSpeed: 8, condition: "cloudy" },
-	{ time: "7 PM", temp: 73, humidity: 62, precipitation: 0, windSpeed: 7, condition: "cloudy" },
-	{ time: "8 PM", temp: 72, humidity: 65, precipitation: 0, windSpeed: 6, condition: "clear" },
-	{ time: "9 PM", temp: 71, humidity: 67, precipitation: 0, windSpeed: 5, condition: "clear" },
-	{ time: "10 PM", temp: 70, humidity: 68, precipitation: 0, windSpeed: 6, condition: "clear" },
-	{ time: "11 PM", temp: 69, humidity: 70, precipitation: 0, windSpeed: 7, condition: "clear" },
-]
-
-const weeklyData = [
-	{ day: "Mon", temp: 72, humidity: 65, precipitation: 20, windSpeed: 12, condition: "rainy", high: 75, low: 68 },
-	{ day: "Tue", temp: 75, humidity: 60, precipitation: 5, windSpeed: 8, condition: "cloudy", high: 78, low: 70 },
-	{ day: "Wed", temp: 73, humidity: 70, precipitation: 0, windSpeed: 6, condition: "sunny", high: 76, low: 69 },
-	{ day: "Thu", temp: 78, humidity: 55, precipitation: 0, windSpeed: 9, condition: "sunny", high: 82, low: 73 },
-	{ day: "Fri", temp: 80, humidity: 50, precipitation: 0, windSpeed: 7, condition: "sunny", high: 84, low: 75 },
-	{ day: "Sat", temp: 77, humidity: 65, precipitation: 15, windSpeed: 11, condition: "cloudy", high: 80, low: 72 },
-	{ day: "Sun", temp: 74, humidity: 70, precipitation: 30, windSpeed: 13, condition: "rainy", high: 77, low: 70 },
-]
+// dynamic data loaded from backend
+type HourPoint = { time: string, temp: number, humidity: number, precipitation: number, windSpeed: number, condition: string }
+type DayPoint = { day: string, temp: number, humidity: number, precipitation: number, windSpeed: number, condition: string, high: number, low: number }
 
 const getWeatherIcon = (condition: string) => {
 	switch (condition) {
@@ -60,7 +29,7 @@ const getWeatherIcon = (condition: string) => {
 	}
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, unitLabels }: any) => {
 	if (active && payload && payload.length) {
 		const data = payload[0].payload
 		return (
@@ -77,10 +46,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 						/>
 						<span className="text-muted-foreground">{entry.name}:</span>
 						<span className="font-medium">
-							{entry.name === "Temperature" ? `${entry.value}°F` :
+							{entry.name === "Temperature" ? `${entry.value}${unitLabels.temp}` :
 								entry.name === "Humidity" ? `${entry.value}%` :
 									entry.name === "Precipitation" ? `${entry.value}%` :
-										entry.name === "Wind Speed" ? `${entry.value} mph` :
+										entry.name === "Wind Speed" ? `${entry.value} ${unitLabels.wind}` :
 											entry.value}
 						</span>
 					</div>
@@ -94,9 +63,90 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function ForecastChart() {
 	const [activeTab, setActiveTab] = useState<"hourly" | "weekly">("hourly")
 	const [activeMetric, setActiveMetric] = useState<"temperature" | "humidity" | "precipitation" | "wind">("temperature")
+	const [unitSystem, setUnitSystem] = useState<"imperial" | "metric">("imperial")
+	const unitLabels = useMemo(() => ({ temp: unitSystem === "metric" ? "°C" : "°F", wind: unitSystem === "metric" ? "km/h" : "mph" }), [unitSystem])
+	const [hourlyData, setHourlyData] = useState<HourPoint[]>([])
+	const [weeklyData, setWeeklyData] = useState<DayPoint[]>([])
 
 	const data = activeTab === "hourly" ? hourlyData : weeklyData
 	const xKey = activeTab === "hourly" ? "time" : "day"
+
+	// Load units from preferences/local storage
+	useEffect(() => {
+		const initUnits = async () => {
+			try {
+				const me = await getCurrentUser()
+				const prefs = me?.data?.user?.preferences
+				if (prefs?.temperatureUnit === "celsius") setUnitSystem("metric")
+			} catch {}
+			const local = loadLocalSettings<any>("atmosai_settings", null)
+			if (local && local.temperatureUnit === "celsius") setUnitSystem("metric")
+		}
+		initUnits()
+	}, [])
+
+	// Fetch hourly and daily forecast
+	useEffect(() => {
+		const fetchAll = async (lat: number, lng: number) => {
+			try {
+				const [hourRes, dayRes] = await Promise.all([
+					fetch(`http://localhost:5000/api/weather/hourly?lat=${lat}&lng=${lng}&hours=24&units=${unitSystem}`),
+					fetch(`http://localhost:5000/api/weather/forecast?lat=${lat}&lng=${lng}&days=7&units=${unitSystem}`),
+				])
+
+				let hourJson: any = null
+				if (hourRes.ok) {
+					try { hourJson = await hourRes.json() } catch { hourJson = null }
+				}
+				if (hourJson?.success && Array.isArray(hourJson.data)) {
+					const h: HourPoint[] = hourJson.data.map((h: any) => ({
+						time: new Date(h.time).toLocaleTimeString([], { hour: 'numeric' }),
+						temp: Math.round(h.temperature ?? 0),
+						humidity: h.humidity ?? 0,
+						precipitation: Math.round(h.precipitation?.probability ?? 0),
+						windSpeed: Math.round(h.windSpeed ?? 0),
+						condition: (h.condition?.main || '').toLowerCase(),
+					}))
+					setHourlyData(h)
+				} else {
+					setHourlyData([])
+				}
+
+				let dayJson: any = null
+				if (dayRes.ok) {
+					try { dayJson = await dayRes.json() } catch { dayJson = null }
+				}
+				if (dayJson?.success && Array.isArray(dayJson.data)) {
+					const d: DayPoint[] = dayJson.data.map((d: any) => ({
+						day: new Date(d.date).toLocaleDateString([], { weekday: 'short' }),
+						temp: Math.round(d.temperature?.day ?? d.temperature?.max ?? 0),
+						high: Math.round(d.temperature?.max ?? 0),
+						low: Math.round(d.temperature?.min ?? 0),
+						humidity: d.humidity ?? 0,
+						precipitation: Math.round(d.precipitation?.probability ?? 0),
+						windSpeed: Math.round(d.windSpeed ?? 0),
+						condition: (d.condition?.main || '').toLowerCase(),
+					}))
+					setWeeklyData(d)
+				} else {
+					setWeeklyData([])
+				}
+			} catch {
+				setHourlyData([])
+				setWeeklyData([])
+			}
+		}
+
+		if (navigator?.geolocation) {
+			navigator.geolocation.getCurrentPosition(
+				(pos) => fetchAll(pos.coords.latitude, pos.coords.longitude),
+				() => fetchAll(37.7749, -122.4194),
+				{ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+			)
+		} else {
+			fetchAll(37.7749, -122.4194)
+		}
+	}, [unitSystem])
 
 	const getChartContent = () => {
 		if (activeMetric === "temperature") {
@@ -110,7 +160,7 @@ export function ForecastChart() {
 						interval={activeTab === "hourly" ? 2 : 0}
 					/>
 					<YAxis hide />
-					<Tooltip content={<CustomTooltip />} />
+					<Tooltip content={<CustomTooltip unitLabels={unitLabels} />} />
 					<Legend />
 					{activeTab === "weekly" ? (
 						<>
@@ -144,7 +194,7 @@ export function ForecastChart() {
 					interval={activeTab === "hourly" ? 2 : 0}
 				/>
 				<YAxis hide />
-				<Tooltip content={<CustomTooltip />} />
+				<Tooltip content={<CustomTooltip unitLabels={unitLabels} />} />
 				<Legend />
 				{activeMetric === "humidity" && (
 					<Area
@@ -265,7 +315,7 @@ export function ForecastChart() {
 									activeMetric === "humidity" ? d.humidity :
 										activeMetric === "precipitation" ? d.precipitation :
 											d.windSpeed))}
-								{activeMetric === "temperature" ? "°F" :
+						{activeMetric === "temperature" ? unitLabels.temp :
 									activeMetric === "humidity" ? "%" :
 										activeMetric === "precipitation" ? "%" : " mph"}
 							</div>
@@ -278,7 +328,7 @@ export function ForecastChart() {
 									activeMetric === "humidity" ? d.humidity :
 										activeMetric === "precipitation" ? d.precipitation :
 											d.windSpeed))}
-								{activeMetric === "temperature" ? "°F" :
+						{activeMetric === "temperature" ? unitLabels.temp :
 									activeMetric === "humidity" ? "%" :
 										activeMetric === "precipitation" ? "%" : " mph"}
 							</div>
@@ -290,7 +340,7 @@ export function ForecastChart() {
 									activeMetric === "humidity" ? d.humidity :
 										activeMetric === "precipitation" ? d.precipitation :
 											d.windSpeed), 0) / data.length)}
-								{activeMetric === "temperature" ? "°F" :
+						{activeMetric === "temperature" ? unitLabels.temp :
 									activeMetric === "humidity" ? "%" :
 										activeMetric === "precipitation" ? "%" : " mph"}
 							</div>

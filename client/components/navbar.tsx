@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { Home, Calendar, AlertTriangle, Settings, Mic } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Home, Calendar, AlertTriangle, Settings, Mic, LogIn, LogOut, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { AuthModal } from "@/components/auth-modal"
 
 interface NavbarProps {
   currentPage: string
@@ -12,6 +13,25 @@ interface NavbarProps {
 
 export function Navbar({ currentPage, onPageChange }: NavbarProps) {
   const [isListening, setIsListening] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+  const [isAuthed, setIsAuthed] = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      try { setIsAuthed(!!localStorage.getItem('atmosai_token')) } catch { setIsAuthed(false) }
+    }
+    check()
+    const onStorage = (e: StorageEvent) => { if (e.key === 'atmosai_token') check() }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  const handleLogout = () => {
+    try { localStorage.removeItem('atmosai_token') } catch {}
+    setIsAuthed(false)
+    // Reload to clear any authed state and refetch data
+    window.location.reload()
+  }
 
   const navItems = [
     { id: "dashboard", icon: Home, label: "Dashboard" },
@@ -39,6 +59,9 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => onPageChange(item.id)}
+                  type="button"
+                  aria-label={item.label}
+                  title={item.label}
                   className={cn(
                     "relative p-3 rounded-xl transition-all duration-200",
                     currentPage === item.id
@@ -51,6 +74,47 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
                 </Button>
               )
             })}
+            {!isAuthed ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAuthOpen(true)}
+                type="button"
+                aria-label="Login"
+                title="Login"
+                className={cn("relative p-3 rounded-xl transition-all duration-200 hover:bg-white/20 text-foreground/70 hover:text-foreground")}
+              >
+                <LogIn className="h-5 w-5" />
+                <span className="sr-only">Login</span>
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onPageChange('settings')}
+                  type="button"
+                  aria-label="Account"
+                  title="Account"
+                  className={cn("relative p-3 rounded-xl transition-all duration-200 hover:bg-white/20 text-foreground/70 hover:text-foreground")}
+                >
+                  <User className="h-5 w-5" />
+                  <span className="sr-only">Account</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  type="button"
+                  aria-label="Logout"
+                  title="Logout"
+                  className={cn("relative p-3 rounded-xl transition-all duration-200 hover:bg-white/20 text-foreground/70 hover:text-foreground")}
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="sr-only">Logout</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -66,6 +130,8 @@ export function Navbar({ currentPage, onPageChange }: NavbarProps) {
         <Mic className={cn("h-6 w-6", isListening && "animate-pulse")} />
         <span className="sr-only">Voice Assistant</span>
       </Button>
+
+      <AuthModal open={authOpen} onOpenChange={setAuthOpen} onAuthenticated={() => { window.location.reload() }} />
     </>
   )
 }
