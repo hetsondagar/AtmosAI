@@ -190,7 +190,7 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
     },
     {
       label: "Visibility",
-      value: `${currentWeather.visibility} mi`,
+      value: `${currentWeather.visibility} ${unitSystem === "metric" ? "km" : "mi"}`,
       icon: Eye,
       color: "text-purple-500",
       bgColor: "bg-purple-500/10",
