@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { AlertCard } from "@/components/alert-card"
 import { AlertFilters } from "@/components/alert-filters"
 import { EmptyAlerts } from "@/components/empty-alerts"
+import { API_BASE_URL, loadLocalSettings } from "@/lib/api"
+import { getCurrentLocation, type LocationData } from "@/lib/location"
 
 export interface Alert {
   id: string
@@ -21,87 +23,78 @@ export interface Alert {
 
 export function Alerts() {
   const [selectedFilter, setSelectedFilter] = useState<"all" | Alert["type"]>("all")
-  const [alerts] = useState<Alert[]>([
-    {
-      id: "1",
-      type: "severe",
-      category: "weather",
-      title: "Severe Thunderstorm Warning",
-      description: "Severe thunderstorms with damaging winds up to 70 mph and large hail expected.",
-      location: "San Francisco Bay Area",
-      startTime: new Date(),
-      endTime: new Date(Date.now() + 4 * 60 * 60 * 1000), // 4 hours from now
-      precautions: [
-        "Stay indoors and away from windows",
-        "Avoid using electrical appliances",
-        "Do not drive through flooded roads",
-        "Keep emergency supplies ready",
-      ],
-      isActive: true,
-    },
-    {
-      id: "2",
-      type: "moderate",
-      category: "air-quality",
-      title: "Air Quality Alert",
-      description: "Unhealthy air quality for sensitive groups due to wildfire smoke.",
-      location: "San Francisco, CA",
-      startTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-      endTime: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours from now
-      precautions: [
-        "Limit outdoor activities",
-        "Keep windows and doors closed",
-        "Use air purifiers if available",
-        "Wear N95 masks when outdoors",
-      ],
-      isActive: true,
-    },
-    {
-      id: "3",
-      type: "info",
-      category: "uv",
-      title: "High UV Index",
-      description: "UV index will reach 9 (very high) between 11 AM and 3 PM today.",
-      location: "San Francisco, CA",
-      startTime: new Date(),
-      endTime: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours from now
-      precautions: [
-        "Apply SPF 30+ sunscreen every 2 hours",
-        "Wear protective clothing and sunglasses",
-        "Seek shade during peak hours",
-        "Stay hydrated",
-      ],
-      isActive: true,
-    },
-    {
-      id: "4",
-      type: "moderate",
-      category: "temperature",
-      title: "Heat Advisory",
-      description: "Temperatures expected to reach 95°F with high humidity making it feel like 105°F.",
-      location: "San Francisco, CA",
-      startTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-      endTime: new Date(Date.now() + 48 * 60 * 60 * 1000), // Day after tomorrow
-      precautions: [
-        "Drink plenty of water",
-        "Avoid strenuous outdoor activities",
-        "Check on elderly neighbors",
-        "Never leave children or pets in vehicles",
-      ],
-      isActive: false,
-    },
-  ])
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [locationData, setLocationData] = useState<LocationData | null>(null)
 
-  const filteredAlerts = alerts.filter((alert) => {
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const settings = loadLocalSettings<any>("atmosai_settings", null)
+        const loc = await getCurrentLocation({
+          autoLocation: settings?.autoLocation ?? true,
+          defaultLocation: settings?.defaultLocation ?? "San Francisco, CA",
+          coordinates: settings?.coordinates
+        })
+        setLocationData(loc)
+      } catch {}
+    }
+    init()
+  }, [])
+
+  useEffect(() => {
+    const fetchAlerts = async (lat: number, lng: number) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/weather/alerts?lat=${lat}&lng=${lng}`)
+        const json = await res.json().catch(() => null)
+        if (res.ok && json?.success && Array.isArray(json.data)) {
+          const mapped: Alert[] = json.data.map((a: any, idx: number) => ({
+            id: a.id || String(idx),
+            type: ((a.severity?.level || a.type) >= 4 || a.type === 'severe') ? 'severe' : (a.type === 'info' ? 'info' : 'moderate'),
+            category: (a.category || 'weather'),
+            title: a.title || a.event || 'Weather Alert',
+            description: a.description || a.details || '',
+            location: a.location?.name || a.area || `${lat.toFixed(3)}, ${lng.toFixed(3)}`,
+            startTime: a.startTime ? new Date(a.startTime) : (a.start ? new Date(a.start) : new Date()),
+            endTime: a.endTime ? new Date(a.endTime) : (a.end ? new Date(a.end) : undefined),
+            precautions: Array.isArray(a.precautions) ? a.precautions : (a.instructions ? [a.instructions] : []),
+            isActive: a.isActive !== undefined ? !!a.isActive : true,
+          }))
+          setAlerts(mapped)
+        } else {
+          setAlerts([])
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load alerts')
+        setAlerts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (locationData) {
+      fetchAlerts(locationData.lat, locationData.lng)
+    }
+  }, [locationData])
+
+  const filteredAlerts = useMemo(() => alerts.filter((alert) => {
     if (selectedFilter === "all") return true
     return alert.type === selectedFilter
-  })
+  }), [alerts, selectedFilter])
 
-  const activeAlerts = filteredAlerts.filter((alert) => alert.isActive)
-  const upcomingAlerts = filteredAlerts.filter((alert) => !alert.isActive)
+  const activeAlerts = useMemo(() => filteredAlerts.filter((alert) => alert.isActive), [filteredAlerts])
+  const upcomingAlerts = useMemo(() => filteredAlerts.filter((alert) => !alert.isActive), [filteredAlerts])
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {error && (
+        <div className="text-sm text-red-500 bg-red-500/10 border border-red-500/30 rounded-md p-3">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="text-center">
         <motion.h1

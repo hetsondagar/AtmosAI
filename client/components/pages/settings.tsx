@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Palette, Bell, Mic, MapPin, Heart, Volume2, Smartphone, Save, RotateCcw } from "lucide-react"
+import { Palette, Bell, MapPin, Heart, Smartphone, Save, RotateCcw } from "lucide-react"
 
 export function Settings() {
   const [settings, setSettings] = useState({
@@ -26,11 +26,6 @@ export function Settings() {
     dailyForecast: true,
     healthTips: true,
     pushNotifications: true,
-
-    // Voice Assistant
-    voiceEnabled: true,
-    voiceVolume: [75],
-    wakeWord: "Hey AtmosAI",
 
     // Location
     autoLocation: true,
@@ -64,9 +59,6 @@ export function Settings() {
             dailyForecast: prefs.notifications?.dailyForecast ?? true,
             healthTips: prefs.notifications?.healthTips ?? true,
             pushNotifications: prefs.notifications?.pushNotifications ?? true,
-            voiceEnabled: prefs.voice?.enabled ?? true,
-            voiceVolume: [prefs.voice?.volume ?? 75],
-            wakeWord: prefs.voice?.wakeWord ?? "Hey AtmosAI",
             autoLocation: prefs.location?.autoDetect ?? true,
             defaultLocation: prefs.location?.defaultLocation ?? "San Francisco, CA",
             healthTipsEnabled: prefs.health?.tipsEnabled ?? true,
@@ -89,7 +81,18 @@ export function Settings() {
   }, [])
 
   const updateSetting = (key: string, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value } as typeof prev
+      // Persist immediately so other pages can react
+      try {
+        saveLocalSettings("atmosai_settings", next)
+        // Notify listeners across the app
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('settings-updated', { detail: { key, value } }))
+        }
+      } catch {}
+      return next
+    })
   }
 
   const resetSettings = () => {
@@ -103,9 +106,6 @@ export function Settings() {
       dailyForecast: true,
       healthTips: true,
       pushNotifications: true,
-      voiceEnabled: true,
-      voiceVolume: [75],
-      wakeWord: "Hey AtmosAI",
       autoLocation: true,
       defaultLocation: "San Francisco, CA",
       healthTipsEnabled: true,
@@ -130,11 +130,6 @@ export function Settings() {
         dailyForecast: settings.dailyForecast,
         healthTips: settings.healthTips,
         pushNotifications: settings.pushNotifications,
-      },
-      voice: {
-        enabled: settings.voiceEnabled,
-        volume: settings.voiceVolume?.[0] ?? 75,
-        wakeWord: settings.wakeWord,
       },
       location: {
         autoDetect: settings.autoLocation,
@@ -279,51 +274,7 @@ export function Settings() {
         </SettingsSection>
       </motion.div>
 
-      {/* Voice Assistant Settings */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="border-1 rounded-2xl p-6 glass-strong">
-        <SettingsSection icon={Mic} title="Voice Assistant" description="Configure voice interactions">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
-              <div>
-                <Label className="text-base font-medium">Enable Voice Assistant</Label>
-                <p className="text-sm text-muted-foreground">Use voice commands to interact with AtmosAI</p>
-              </div>
-              <Switch
-                checked={settings.voiceEnabled}
-                onCheckedChange={(checked) => updateSetting("voiceEnabled", checked)}
-              />
-            </div>
-
-            {settings.voiceEnabled && (
-              <>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-muted-foreground" />
-                    <Label>Voice Volume: {settings.voiceVolume[0]}%</Label>
-                  </div>
-                  <Slider
-                    value={settings.voiceVolume}
-                    onValueChange={(value) => updateSetting("voiceVolume", value)}
-                    max={100}
-                    step={5}
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Wake Word</Label>
-                  <Input
-                    value={settings.wakeWord}
-                    onChange={(e) => updateSetting("wakeWord", e.target.value)}
-                    placeholder="Hey AtmosAI"
-                    className="glass border-1"
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </SettingsSection>
-      </motion.div>
+      {/* Voice assistant removed */}
 
       {/* Location Settings */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="border-1 rounded-2xl p-6 glass-strong">

@@ -48,60 +48,39 @@ const fetchUVIndex = async (lat, lng) => {
   }
 };
 
-// Helper function to fetch weather data from OpenWeather API (One Call if available)
+// Helper function to fetch weather data from OpenWeather API (Free plan endpoints)
 const fetchWeatherFromAPI = async (lat, lng, units = 'imperial') => {
   try {
-    // Try One Call API first
-    const response = await axios.get(`${WEATHER_API_BASE_URL}/onecall`, {
-      params: {
-        lat,
-        lon: lng, // OpenWeather expects 'lon'
-        appid: WEATHER_API_KEY,
-        units,
-        exclude: 'minutely'
-      }
-    });
-    const apiData = response.data;
-    // Enrich with AQ and UV in parallel
-    const [airQuality, uvi] = await Promise.all([
-      fetchAirQuality(lat, lng),
-      fetchUVIndex(lat, lng),
-    ]);
-    if (airQuality) {
-      apiData.current = apiData.current || {};
-      apiData.current.air_quality = airQuality;
-    }
-    if (typeof uvi === 'number') {
-      apiData.current.uvi = uvi;
-    }
-    return { source: 'onecall', data: apiData };
+    // Use free endpoints directly for free plan
+    logger.info('Using free OpenWeather API endpoints');
+    const normalized = await fetchWeatherFromV2(lat, lng, units);
+    return {
+      source: 'v2',
+      data: normalized,
+    };
   } catch (error) {
-    const status = error.response?.status;
-    const code = error.response?.data?.cod;
-    // Fallback to free endpoints if One Call is unavailable (401/403/404)
-    if (status === 401 || status === 403 || status === 404 || code === 401 || code === 403 || code === 404) {
-      logger.warn('One Call unavailable, falling back to /weather and /forecast');
-      const normalized = await fetchWeatherFromV2(lat, lng, units);
-      return {
-        source: 'v2',
-        data: normalized,
-      };
-    }
     logger.error('Weather API error:', error.response?.data || error.message);
     throw new Error('Failed to fetch weather data');
   }
 };
 
-// Fallback: Build a One-Call-like payload using 2.5 /weather and /forecast (3h) endpoints
+// Free plan: Build a One-Call-like payload using 2.5 /weather and /forecast (3h) endpoints
 const fetchWeatherFromV2 = async (lat, lng, units = 'imperial') => {
   const params = { lat, lon: lng, appid: WEATHER_API_KEY, units };
-  const [currentRes, forecastRes] = await Promise.all([
-    axios.get('https://api.openweathermap.org/data/2.5/weather', { params }),
-    axios.get('https://api.openweathermap.org/data/2.5/forecast', { params }),
-  ]);
+  
+  try {
+    const [currentRes, forecastRes] = await Promise.all([
+      axios.get('https://api.openweathermap.org/data/2.5/weather', { params }),
+      axios.get('https://api.openweathermap.org/data/2.5/forecast', { params }),
+    ]);
 
-  const current = currentRes.data;
-  const list = forecastRes.data?.list || [];
+    const current = currentRes.data;
+    const list = forecastRes.data?.list || [];
+
+    // Validate API response
+    if (!current || !current.main) {
+      throw new Error('Invalid weather data received from API');
+    }
 
   // Normalize "current"
   const normalizedCurrent = {
@@ -168,23 +147,32 @@ const fetchWeatherFromV2 = async (lat, lng, units = 'imperial') => {
     };
   });
 
-  // Enrich with AQ and UV
-  const [airQuality, uvi] = await Promise.all([
-    fetchAirQuality(lat, lng),
-    fetchUVIndex(lat, lng),
-  ]);
-  if (airQuality) normalizedCurrent.air_quality = airQuality;
-  if (typeof uvi === 'number') normalizedCurrent.uvi = uvi;
+  // Try to enrich with AQ and UV (may not be available on free plan)
+  try {
+    const [airQuality, uvi] = await Promise.all([
+      fetchAirQuality(lat, lng).catch(() => null),
+      fetchUVIndex(lat, lng).catch(() => null),
+    ]);
+    if (airQuality) normalizedCurrent.air_quality = airQuality;
+    if (typeof uvi === 'number') normalizedCurrent.uvi = uvi;
+  } catch (error) {
+    logger.warn('Could not fetch air quality or UV data:', error.message);
+    // Continue without AQ/UV data
+  }
 
-  return {
-    lat: Number(lat),
-    lon: Number(lng),
-    timezone: 'local',
-    current: normalizedCurrent,
-    hourly,
-    daily,
-    alerts: [],
-  };
+    return {
+      lat: Number(lat),
+      lon: Number(lng),
+      timezone: 'local',
+      current: normalizedCurrent,
+      hourly,
+      daily,
+      alerts: [],
+    };
+  } catch (error) {
+    logger.error('Free API fetch error:', error.response?.data || error.message);
+    throw new Error(`Failed to fetch weather data: ${error.message}`);
+  }
 };
 
 // Helper to reverse geocode coordinates to a human-readable place name
@@ -233,14 +221,15 @@ const processWeatherData = (apiPayload, location) => {
       humidity: current.humidity,
       pressure: current.pressure,
       visibility: current.visibility ? Math.round(current.visibility / 1000) : null,
-      uvIndex: current.uvi || 0,
+      // Clamp UV index to schema max (11) to avoid validation errors
+      uvIndex: Math.min(typeof current.uvi === 'number' ? current.uvi : 0, 11),
       windSpeed: current.wind_speed,
       windDirection: current.wind_deg,
       windGust: current.wind_gust,
       condition: {
-        main: current.weather[0].main,
-        description: current.weather[0].description,
-        icon: current.weather[0].icon
+        main: current.weather?.[0]?.main || 'Unknown',
+        description: current.weather?.[0]?.description || 'No description',
+        icon: current.weather?.[0]?.icon || '01d'
       },
       airQuality: {
         aqi: current.air_quality?.us_epa_index || null,
@@ -533,6 +522,37 @@ router.get('/alerts', optionalAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch weather alerts'
+    });
+  }
+});
+
+// @route   GET /api/weather/reverse-geocode
+// @desc    Get location name from coordinates
+// @access  Public
+router.get('/reverse-geocode', async (req, res) => {
+  try {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({
+        success: false,
+        message: 'Latitude and longitude are required'
+      });
+    }
+
+    const locationName = await reverseGeocode(lat, lng);
+    
+    res.json({
+      success: true,
+      data: {
+        locationName: locationName || `${lat}, ${lng}`
+      }
+    });
+  } catch (error) {
+    logger.error('Reverse geocoding error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get location name'
     });
   }
 });

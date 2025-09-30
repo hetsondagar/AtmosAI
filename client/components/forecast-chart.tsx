@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, ComposedChart, AreaChart, Area } from "recharts"
 import { Cloud, CloudRain, Sun, CloudSnow, Zap } from "lucide-react"
-import { getCurrentUser, loadLocalSettings } from "@/lib/api"
+import { API_BASE_URL, getCurrentUser, loadLocalSettings } from "@/lib/api"
+import { getCurrentLocation, type LocationData } from "@/lib/location"
 
 // dynamic data loaded from backend
 type HourPoint = { time: string, temp: number, humidity: number, precipitation: number, windSpeed: number, condition: string }
@@ -67,6 +68,7 @@ export function ForecastChart() {
 	const unitLabels = useMemo(() => ({ temp: unitSystem === "metric" ? "°C" : "°F", wind: unitSystem === "metric" ? "km/h" : "mph" }), [unitSystem])
 	const [hourlyData, setHourlyData] = useState<HourPoint[]>([])
 	const [weeklyData, setWeeklyData] = useState<DayPoint[]>([])
+	const [locationData, setLocationData] = useState<LocationData | null>(null)
 
 	const data = activeTab === "hourly" ? hourlyData : weeklyData
 	const xKey = activeTab === "hourly" ? "time" : "day"
@@ -85,13 +87,42 @@ export function ForecastChart() {
 		initUnits()
 	}, [])
 
+  // React to settings changes immediately
+  useEffect(() => {
+    const onSettingsUpdated = () => {
+      const local = loadLocalSettings<any>("atmosai_settings", null)
+      if (local) setUnitSystem(local.temperatureUnit === "celsius" ? "metric" : "imperial")
+    }
+    window.addEventListener('settings-updated', onSettingsUpdated as any)
+    return () => window.removeEventListener('settings-updated', onSettingsUpdated as any)
+  }, [])
+
+	// Initialize location
+	useEffect(() => {
+		const initializeLocation = async () => {
+			try {
+				const settings = loadLocalSettings<any>("atmosai_settings", null)
+				const locationSettings = {
+					autoLocation: settings?.autoLocation ?? true,
+					defaultLocation: settings?.defaultLocation ?? "San Francisco, CA",
+					coordinates: settings?.coordinates
+				}
+				const location = await getCurrentLocation(locationSettings)
+				setLocationData(location)
+			} catch (error) {
+				console.warn('Location initialization failed:', error)
+			}
+		}
+		initializeLocation()
+	}, [])
+
 	// Fetch hourly and daily forecast
 	useEffect(() => {
 		const fetchAll = async (lat: number, lng: number) => {
 			try {
 				const [hourRes, dayRes] = await Promise.all([
-					fetch(`http://localhost:5000/api/weather/hourly?lat=${lat}&lng=${lng}&hours=24&units=${unitSystem}`),
-					fetch(`http://localhost:5000/api/weather/forecast?lat=${lat}&lng=${lng}&days=7&units=${unitSystem}`),
+                    fetch(`${API_BASE_URL}/api/weather/hourly?lat=${lat}&lng=${lng}&hours=24&units=${unitSystem}`),
+                    fetch(`${API_BASE_URL}/api/weather/forecast?lat=${lat}&lng=${lng}&days=7&units=${unitSystem}`),
 				])
 
 				let hourJson: any = null
@@ -99,14 +130,29 @@ export function ForecastChart() {
 					try { hourJson = await hourRes.json() } catch { hourJson = null }
 				}
 				if (hourJson?.success && Array.isArray(hourJson.data)) {
-					const h: HourPoint[] = hourJson.data.map((h: any) => ({
-						time: new Date(h.time).toLocaleTimeString([], { hour: 'numeric' }),
-						temp: Math.round(h.temperature ?? 0),
-						humidity: h.humidity ?? 0,
-						precipitation: Math.round(h.precipitation?.probability ?? 0),
-						windSpeed: Math.round(h.windSpeed ?? 0),
-						condition: (h.condition?.main || '').toLowerCase(),
-					}))
+        const h: HourPoint[] = hourJson.data.map((p: any) => {
+            // Temperature with unit safety correction
+            let t = Math.round(p.temperature ?? 0)
+            if (unitSystem === "metric" && t > 60) t = Math.round((t - 32) * 5 / 9)
+            if (unitSystem === "imperial" && t < 45) t = Math.round((t * 9) / 5 + 32)
+
+            // Wind speed as-is; labels will reflect units. If your backend returns m/s for metric
+            // and you want km/h, convert here instead.
+            let w = Math.round(p.windSpeed ?? 0)
+            if (unitSystem === "metric") {
+                // Convert m/s -> km/h if values look like m/s (heuristic: small numbers)
+                if (w <= 30) w = Math.round(w * 3.6)
+            }
+
+            return {
+                time: new Date(p.time).toLocaleTimeString([], { hour: 'numeric' }),
+                temp: t,
+                humidity: p.humidity ?? 0,
+                precipitation: Math.round(p.precipitation?.probability ?? 0),
+                windSpeed: w,
+                condition: (p.condition?.main || '').toLowerCase(),
+            }
+        })
 					setHourlyData(h)
 				} else {
 					setHourlyData([])
@@ -117,16 +163,36 @@ export function ForecastChart() {
 					try { dayJson = await dayRes.json() } catch { dayJson = null }
 				}
 				if (dayJson?.success && Array.isArray(dayJson.data)) {
-					const d: DayPoint[] = dayJson.data.map((d: any) => ({
-						day: new Date(d.date).toLocaleDateString([], { weekday: 'short' }),
-						temp: Math.round(d.temperature?.day ?? d.temperature?.max ?? 0),
-						high: Math.round(d.temperature?.max ?? 0),
-						low: Math.round(d.temperature?.min ?? 0),
-						humidity: d.humidity ?? 0,
-						precipitation: Math.round(d.precipitation?.probability ?? 0),
-						windSpeed: Math.round(d.windSpeed ?? 0),
-						condition: (d.condition?.main || '').toLowerCase(),
-					}))
+        const d: DayPoint[] = dayJson.data.map((p: any) => {
+            let td = Math.round(p.temperature?.day ?? p.temperature?.max ?? 0)
+            let th = Math.round(p.temperature?.max ?? 0)
+            let tl = Math.round(p.temperature?.min ?? 0)
+            if (unitSystem === "metric") {
+                if (td > 60) td = Math.round((td - 32) * 5 / 9)
+                if (th > 60) th = Math.round((th - 32) * 5 / 9)
+                if (tl > 60) tl = Math.round((tl - 32) * 5 / 9)
+            } else {
+                if (td < 45) td = Math.round((td * 9) / 5 + 32)
+                if (th < 45) th = Math.round((th * 9) / 5 + 32)
+                if (tl < 45) tl = Math.round((tl * 9) / 5 + 32)
+            }
+
+            let w = Math.round(p.windSpeed ?? 0)
+            if (unitSystem === "metric") {
+                if (w <= 30) w = Math.round(w * 3.6)
+            }
+
+            return {
+                day: new Date(p.date).toLocaleDateString([], { weekday: 'short' }),
+                temp: td,
+                high: th,
+                low: tl,
+                humidity: p.humidity ?? 0,
+                precipitation: Math.round(p.precipitation?.probability ?? 0),
+                windSpeed: w,
+                condition: (p.condition?.main || '').toLowerCase(),
+            }
+        })
 					setWeeklyData(d)
 				} else {
 					setWeeklyData([])
@@ -137,16 +203,10 @@ export function ForecastChart() {
 			}
 		}
 
-		if (navigator?.geolocation) {
-			navigator.geolocation.getCurrentPosition(
-				(pos) => fetchAll(pos.coords.latitude, pos.coords.longitude),
-				() => fetchAll(37.7749, -122.4194),
-				{ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-			)
-		} else {
-			fetchAll(37.7749, -122.4194)
+		if (locationData) {
+			fetchAll(locationData.lat, locationData.lng)
 		}
-	}, [unitSystem])
+	}, [locationData, unitSystem])
 
 	const getChartContent = () => {
 		if (activeMetric === "temperature") {

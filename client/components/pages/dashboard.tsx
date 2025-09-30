@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { getCurrentUser, loadLocalSettings } from "@/lib/api"
+import { API_BASE_URL, getCurrentUser, loadLocalSettings } from "@/lib/api"
+import { getCurrentLocation, watchLocation, stopWatchingLocation, getLocationName, type LocationData } from "@/lib/location"
 import { WeatherCard } from "@/components/weather-card"
 import { MetricCard } from "@/components/metric-card"
 import { ForecastChart } from "@/components/forecast-chart"
@@ -31,6 +32,8 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
   const [tempUnit, setTempUnit] = useState<"°F" | "°C">("°F")
   const [windUnit, setWindUnit] = useState<"mph" | "km/h" | "m/s">("mph")
   const [pressureUnit, setPressureUnit] = useState<"inHg" | "hPa" | "mb">("inHg")
+  const [locationData, setLocationData] = useState<LocationData | null>(null)
+  const [locationWatchId, setLocationWatchId] = useState<number | null>(null)
 
   useEffect(() => {
     onWeatherChange(currentWeather.condition)
@@ -85,7 +88,7 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
 
   // Refresh units on window focus (to pick up changes saved in Settings)
   useEffect(() => {
-    const onFocus = () => {
+    const applyLocalSettings = () => {
       try {
         const local = loadLocalSettings<any>("atmosai_settings", null)
         if (local) {
@@ -99,65 +102,120 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
         }
       } catch {}
     }
+    const onFocus = () => applyLocalSettings()
+    const onSettingsUpdated = () => applyLocalSettings()
     window.addEventListener("focus", onFocus)
-    return () => window.removeEventListener("focus", onFocus)
+    window.addEventListener("settings-updated", onSettingsUpdated as any)
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("settings-updated", onSettingsUpdated as any)
+    }
   }, [])
 
-  // Fetch weather using browser geolocation
+  // Initialize location and start watching
+  useEffect(() => {
+    const initializeLocation = async () => {
+      try {
+        // Load user settings for location preferences
+        const settings = loadLocalSettings<any>("atmosai_settings", null)
+        const locationSettings = {
+          autoLocation: settings?.autoLocation ?? true,
+          defaultLocation: settings?.defaultLocation ?? "San Francisco, CA",
+          coordinates: settings?.coordinates
+        }
+
+        // Get initial location
+        const location = await getCurrentLocation(locationSettings)
+        setLocationData(location)
+
+        // Start watching location if auto-location is enabled
+        if (locationSettings.autoLocation) {
+          const watchId = watchLocation(
+            (newLocation) => {
+              setLocationData(newLocation)
+            },
+            (error) => {
+              console.warn('Location watch error:', error)
+            },
+            locationSettings
+          )
+          setLocationWatchId(watchId)
+        }
+      } catch (error) {
+        console.warn('Location initialization failed:', error)
+      }
+    }
+
+    initializeLocation()
+
+    // Cleanup on unmount
+    return () => {
+      if (locationWatchId !== null) {
+        stopWatchingLocation(locationWatchId)
+      }
+    }
+  }, [])
+
+  // Fetch weather data when location or units change
   useEffect(() => {
     const fetchWeather = async (lat: number, lng: number) => {
       try {
-        const res = await fetch(`http://localhost:5000/api/weather/current?lat=${lat}&lng=${lng}&units=${unitSystem}`)
+        const res = await fetch(`${API_BASE_URL}/api/weather/current?lat=${lat}&lng=${lng}&units=${unitSystem}`)
         const json = await res.json()
         if (json?.success && json?.data) {
           const data = json.data
           const cond = mapCondition(data?.condition?.main, data?.condition?.description)
-          // Convert values for display per selected units
-          const temp = Math.round(data?.temperature ?? 72)
+          
+          // Convert values for display per selected units (with safety correction)
+          let temp = Math.round(data?.temperature ?? 72)
+          // If backend units and frontend units ever diverge, correct heuristically
+          if (unitSystem === "metric" && temp > 60) {
+            // Looks like Fahrenheit came in while we display Celsius
+            temp = Math.round((temp - 32) * 5 / 9)
+          } else if (unitSystem === "imperial" && temp < 45) {
+            // Looks like Celsius came in while we display Fahrenheit
+            temp = Math.round((temp * 9) / 5 + 32)
+          }
           let wind = Math.round(data?.windSpeed ?? 0)
+          
           // OpenWeather returns m/s for metric; convert to km/h if needed
           if (unitSystem === "metric" && windUnit === "km/h") {
             wind = Math.round((data?.windSpeed ?? 0) * 3.6)
           }
+          
           const pressureHpa = data?.pressure ?? 0
           const pressureInHg = Math.round((pressureHpa * 0.02953) * 100) / 100
 
+          // Get location name if not already available
+          let locationName = data?.locationName
+          if (!locationName && locationData) {
+            locationName = await getLocationName(lat, lng)
+          }
+
           setCurrentWeather({
-            location: data?.locationName || `${lat.toFixed(3)}, ${lng.toFixed(3)}`,
-            temperature: unitSystem === "metric" ? temp : temp, // backend respects units
+            location: locationName || `${lat.toFixed(3)}, ${lng.toFixed(3)}`,
+            temperature: temp, // Backend already respects units
             condition: cond,
             description: data?.condition?.description ?? "",
             humidity: data?.humidity ?? 0,
             windSpeed: wind,
             uvIndex: Math.round(data?.uvIndex ?? 0),
             aqi: data?.airQuality?.aqi ?? 0,
-            // backend visibility is in km; show km for metric, miles for imperial
+            // Backend visibility is in km; show km for metric, miles for imperial
             visibility: unitSystem === "metric" ? Math.round(data?.visibility ?? 0) : Math.round(((data?.visibility ?? 0) * 0.621371)),
             pressure: pressureUnit === "inHg" ? pressureInHg : pressureHpa,
           })
         }
       } catch (e) {
-        // Silent fail; keep defaults
+        console.warn('Weather fetch failed:', e)
+        // Keep current weather data on error
       }
     }
 
-    if (navigator?.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords
-          fetchWeather(latitude, longitude)
-        },
-        () => {
-          // Fallback: San Francisco coords
-          fetchWeather(37.7749, -122.4194)
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-      )
-    } else {
-      // Geolocation not available, fallback
-      fetchWeather(37.7749, -122.4194)
+    if (locationData) {
+      fetchWeather(locationData.lat, locationData.lng)
     }
-  }, [unitSystem, pressureUnit])
+  }, [locationData, unitSystem, windUnit, pressureUnit])
 
   const metrics = [
     {
