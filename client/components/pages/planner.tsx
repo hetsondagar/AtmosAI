@@ -113,6 +113,7 @@ export function Planner() {
             description: created.description,
           },
         ])
+        try { window.dispatchEvent(new CustomEvent('events-updated')) } catch {}
       }
     } catch {}
   }
@@ -120,6 +121,7 @@ export function Planner() {
   const deleteEvent = async (eventId: string) => {
     try { await deleteEventById(eventId) } catch {}
     setEvents(events.filter((event) => event.id !== eventId))
+    try { window.dispatchEvent(new CustomEvent('events-updated')) } catch {}
   }
 
   return (

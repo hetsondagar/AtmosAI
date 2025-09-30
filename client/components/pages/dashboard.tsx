@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { API_BASE_URL, getCurrentUser, loadLocalSettings } from "@/lib/api"
+import { API_BASE_URL, getCurrentUser, loadLocalSettings, fetchEvents } from "@/lib/api"
 import { getCurrentLocation, watchLocation, stopWatchingLocation, getLocationName, type LocationData } from "@/lib/location"
 import { WeatherCard } from "@/components/weather-card"
 import { MetricCard } from "@/components/metric-card"
@@ -27,7 +27,7 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
     pressure: 0,
   })
 
-  const [streak, setStreak] = useState(3)
+  const [streak, setStreak] = useState(0)
   const [unitSystem, setUnitSystem] = useState<"imperial" | "metric">("imperial")
   const [tempUnit, setTempUnit] = useState<"°F" | "°C">("°F")
   const [windUnit, setWindUnit] = useState<"mph" | "km/h" | "m/s">("mph")
@@ -216,6 +216,52 @@ export function Dashboard({ onWeatherChange }: DashboardProps) {
       fetchWeather(locationData.lat, locationData.lng)
     }
   }, [locationData, unitSystem, windUnit, pressureUnit])
+
+  // Compute outdoor activity streak from planner events (last 14 days)
+  useEffect(() => {
+    const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+    const loadStreak = async () => {
+      try {
+        const lookbackDays = 14
+        const today = new Date()
+        let current = 0
+        for (let i = 0; i < lookbackDays; i++) {
+          const d = new Date(today)
+          d.setDate(today.getDate() - i)
+          const y = d.getFullYear(); const m = (d.getMonth() + 1).toString().padStart(2, '0'); const day = d.getDate().toString().padStart(2, '0')
+          const dateStr = `${y}-${m}-${day}`
+          let list: any[] = []
+          try {
+            const resCompleted = await fetchEvents({ date: dateStr, type: 'outdoor', status: 'completed', limit: 200 } as any)
+            list = Array.isArray(resCompleted?.data) ? resCompleted.data : []
+          } catch {}
+          if (list.length === 0) {
+            try {
+              const resAny = await fetchEvents({ date: dateStr, type: 'outdoor', limit: 200 })
+              list = Array.isArray(resAny?.data) ? resAny.data : []
+            } catch {}
+          }
+          const hasOutdoor = list.some((ev: any) => {
+            const evDate = new Date(ev.date || ev.startTime || ev.createdAt || dateStr)
+            return (ev?.type === 'outdoor') && sameDay(evDate, d)
+          })
+          if (hasOutdoor) current += 1; else break
+        }
+        setStreak(current)
+      } catch {
+        setStreak(0)
+      }
+    }
+    loadStreak()
+    const onFocus = () => loadStreak()
+    const onEventsUpdated = () => loadStreak()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('events-updated', onEventsUpdated as any)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('events-updated', onEventsUpdated as any)
+    }
+  }, [])
 
   const metrics = [
     {
